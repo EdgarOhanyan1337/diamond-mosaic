@@ -143,7 +143,7 @@ function App() {
             </div>
             <Slider
               min={20}
-              max={150}
+              max={400}
               step={10}
               value={gridSize}
               onChange={(e) => setGridSize(Number(e.target.value))}

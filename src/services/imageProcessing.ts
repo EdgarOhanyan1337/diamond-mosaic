@@ -2,7 +2,8 @@ import type { ProcessMessage, ProcessResult, ProcessSettings } from "../workers/
 
 export async function processImage(
   imageFile: File,
-  gridSize: number,
+  gridWidth: number,
+  gridHeight: number,
   settings: ProcessSettings
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
@@ -12,16 +13,9 @@ export async function processImage(
     img.onload = () => {
       URL.revokeObjectURL(url);
       
-      // Calculate dimensions while maintaining aspect ratio
-      const aspectRatio = img.width / img.height;
-      let targetWidth = gridSize;
-      let targetHeight = gridSize;
-      
-      if (aspectRatio > 1) {
-        targetHeight = Math.round(gridSize / aspectRatio);
-      } else {
-        targetWidth = Math.round(gridSize * aspectRatio);
-      }
+      // Resize using canvas to exact requested dimensions
+      const targetWidth = gridWidth;
+      const targetHeight = gridHeight;
 
       // Resize using canvas
       const canvas = document.createElement("canvas");
