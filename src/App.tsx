@@ -5,8 +5,7 @@ import { Workspace } from "./features/workspace/Workspace"
 import { Button } from "./components/ui/Button"
 import { Slider } from "./components/ui/Slider"
 import { Switch } from "./components/ui/Switch"
-import { Card, CardContent } from "./components/ui/Card"
-import { Settings2, Palette, Grid3X3, Image as ImageIcon, FileArchive, FileDown, Loader2, Moon, Sun } from "lucide-react"
+import { Download, Settings2, Palette, Grid3X3, Image as ImageIcon, FileArchive, FileDown, Loader2, Moon, Sun, Link as LinkIcon, Unlink } from "lucide-react"
 import { processImage } from "./services/imageProcessing"
 import type { ProcessResult } from "./workers/imageProcessor.worker"
 import { renderMosaic } from "./services/canvasRenderer"
@@ -20,7 +19,11 @@ function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   // Generator Settings
-  const [gridSize, setGridSize] = useState(40)
+  const [gridWidth, setGridWidth] = useState(40)
+  const [gridHeight, setGridHeight] = useState(40)
+  const [maintainAspect, setMaintainAspect] = useState(true)
+  const originalAspect = useRef<number | null>(null)
+  
   const [colorCount, setColorCount] = useState(24)
   const [isBlackAndWhite, setIsBlackAndWhite] = useState(false)
   const [showSymbols, setShowSymbols] = useState(true)
@@ -36,10 +39,10 @@ function App() {
     }
   }, [isDarkMode])
 
-  const handleProcess = async (file: File, size: number, colors: number, bw: boolean) => {
+  const handleProcess = async (file: File, w: number, h: number, colors: number, bw: boolean) => {
     setIsProcessing(true)
     try {
-      const result = await processImage(file, size, {
+      const result = await processImage(file, w, h, {
         colorCount: colors,
         isBlackAndWhite: bw,
         dithering: false
@@ -55,7 +58,20 @@ function App() {
 
   const handleImageSelected = (file: File) => {
     setImageFile(file)
-    handleProcess(file, gridSize, colorCount, isBlackAndWhite)
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const aspect = img.width / img.height
+      originalAspect.current = aspect
+      let newH = gridHeight
+      if (maintainAspect) {
+        newH = Math.max(10, Math.round(gridWidth / aspect))
+        setGridHeight(newH)
+      }
+      handleProcess(file, gridWidth, newH, colorCount, isBlackAndWhite)
+      URL.revokeObjectURL(url)
+    }
+    img.src = url
   }
 
   // Rerender canvas when settings or result changes
@@ -69,11 +85,11 @@ function App() {
   useEffect(() => {
     if (imageFile) {
       const timeout = setTimeout(() => {
-        handleProcess(imageFile, gridSize, colorCount, isBlackAndWhite)
+        handleProcess(imageFile, gridWidth, gridHeight, colorCount, isBlackAndWhite)
       }, 500) // debounce
       return () => clearTimeout(timeout)
     }
-  }, [gridSize, colorCount, isBlackAndWhite])
+  }, [gridWidth, gridHeight, colorCount, isBlackAndWhite])
 
   const handleExport = async (type: "zip" | "pdf") => {
     if (!processResult) return
@@ -136,18 +152,78 @@ function App() {
             <Settings2 className="w-4 h-4" /> Size & Grid
           </h2>
           
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <label className="text-sm font-medium">Grid Size</label>
-              <span className="text-sm text-muted-foreground">{gridSize}x{gridSize}</span>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Dimensions</label>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 w-6 p-0" 
+                onClick={() => setMaintainAspect(!maintainAspect)}
+                title={maintainAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
+              >
+                {maintainAspect ? <LinkIcon className="w-3 h-3" /> : <Unlink className="w-3 h-3 text-muted-foreground" />}
+              </Button>
             </div>
-            <Slider
-              min={20}
-              max={400}
-              step={10}
-              value={gridSize}
-              onChange={(e) => setGridSize(Number(e.target.value))}
-            />
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Width</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={10}
+                    max={1000}
+                    value={gridWidth}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      setGridWidth(val)
+                      if (maintainAspect && originalAspect.current) {
+                        setGridHeight(Math.max(10, Math.round(val / originalAspect.current)))
+                      }
+                    }}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  <span className="absolute right-3 top-2 text-xs text-muted-foreground pointer-events-none">px</span>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Height</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={10}
+                    max={1000}
+                    value={gridHeight}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      setGridHeight(val)
+                      if (maintainAspect && originalAspect.current) {
+                        setGridWidth(Math.max(10, Math.round(val * originalAspect.current)))
+                      }
+                    }}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  <span className="absolute right-3 top-2 text-xs text-muted-foreground pointer-events-none">px</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="pt-2">
+              <Slider
+                min={10}
+                max={500}
+                step={1}
+                value={gridWidth}
+                onChange={(e) => {
+                  const val = Number(e.target.value)
+                  setGridWidth(val)
+                  if (maintainAspect && originalAspect.current) {
+                    setGridHeight(Math.max(10, Math.round(val / originalAspect.current)))
+                  }
+                }}
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-between">
