@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from "react"
 import { AppLayout } from "./components/layout/AppLayout"
+import { cn } from "./utils/cn"
 import { ImageUpload } from "./features/upload/ImageUpload"
 import { Workspace } from "./features/workspace/Workspace"
 import { Button } from "./components/ui/Button"
 import { Slider } from "./components/ui/Slider"
 import { Switch } from "./components/ui/Switch"
+import { Card, CardContent } from "./components/ui/Card"
 import { Download, Settings2, Palette, Grid3X3, Image as ImageIcon, FileArchive, FileDown, Loader2, Moon, Sun, Link as LinkIcon, Unlink } from "lucide-react"
 import { processImage } from "./services/imageProcessing"
 import type { ProcessResult } from "./workers/imageProcessor.worker"
@@ -22,6 +24,8 @@ function App() {
   const [gridWidth, setGridWidth] = useState(40)
   const [gridHeight, setGridHeight] = useState(40)
   const [maintainAspect, setMaintainAspect] = useState(true)
+  const [unit, setUnit] = useState<"cells" | "cm">("cells")
+  const [drillSize, setDrillSize] = useState(2.5) // in mm
   const originalAspect = useRef<number | null>(null)
   
   const [colorCount, setColorCount] = useState(24)
@@ -155,15 +159,31 @@ function App() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <label className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Dimensions</label>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-6 w-6 p-0" 
-                onClick={() => setMaintainAspect(!maintainAspect)}
-                title={maintainAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
-              >
-                {maintainAspect ? <LinkIcon className="w-3 h-3" /> : <Unlink className="w-3 h-3 text-muted-foreground" />}
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center rounded-md bg-accent/50 p-0.5">
+                  <button 
+                    className={cn("px-2 py-0.5 text-xs rounded-sm transition-colors", unit === "cells" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                    onClick={() => setUnit("cells")}
+                  >
+                    Cells
+                  </button>
+                  <button 
+                    className={cn("px-2 py-0.5 text-xs rounded-sm transition-colors", unit === "cm" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}
+                    onClick={() => setUnit("cm")}
+                  >
+                    CM
+                  </button>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0 ml-1" 
+                  onClick={() => setMaintainAspect(!maintainAspect)}
+                  title={maintainAspect ? "Unlock aspect ratio" : "Lock aspect ratio"}
+                >
+                  {maintainAspect ? <LinkIcon className="w-3 h-3" /> : <Unlink className="w-3 h-3 text-muted-foreground" />}
+                </Button>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-3">
@@ -172,11 +192,13 @@ function App() {
                 <div className="relative">
                   <input
                     type="number"
-                    min={10}
-                    max={1000}
-                    value={gridWidth}
+                    min={unit === "cm" ? (10 * drillSize) / 10 : 10}
+                    max={unit === "cm" ? (1000 * drillSize) / 10 : 1000}
+                    step={unit === "cm" ? 0.5 : 1}
+                    value={unit === "cm" ? Number((gridWidth / (10 / drillSize)).toFixed(2)) : gridWidth}
                     onChange={(e) => {
-                      const val = Number(e.target.value)
+                      const displayVal = Number(e.target.value)
+                      const val = unit === "cm" ? Math.round(displayVal * (10 / drillSize)) : displayVal
                       setGridWidth(val)
                       if (maintainAspect && originalAspect.current) {
                         setGridHeight(Math.max(10, Math.round(val / originalAspect.current)))
@@ -184,7 +206,7 @@ function App() {
                     }}
                     className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   />
-                  <span className="absolute right-3 top-2 text-xs text-muted-foreground pointer-events-none">px</span>
+                  <span className="absolute right-3 top-2 text-xs text-muted-foreground pointer-events-none">{unit === "cm" ? "cm" : "px"}</span>
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -192,11 +214,13 @@ function App() {
                 <div className="relative">
                   <input
                     type="number"
-                    min={10}
-                    max={1000}
-                    value={gridHeight}
+                    min={unit === "cm" ? (10 * drillSize) / 10 : 10}
+                    max={unit === "cm" ? (1000 * drillSize) / 10 : 1000}
+                    step={unit === "cm" ? 0.5 : 1}
+                    value={unit === "cm" ? Number((gridHeight / (10 / drillSize)).toFixed(2)) : gridHeight}
                     onChange={(e) => {
-                      const val = Number(e.target.value)
+                      const displayVal = Number(e.target.value)
+                      const val = unit === "cm" ? Math.round(displayVal * (10 / drillSize)) : displayVal
                       setGridHeight(val)
                       if (maintainAspect && originalAspect.current) {
                         setGridWidth(Math.max(10, Math.round(val * originalAspect.current)))
@@ -204,19 +228,20 @@ function App() {
                     }}
                     className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   />
-                  <span className="absolute right-3 top-2 text-xs text-muted-foreground pointer-events-none">px</span>
+                  <span className="absolute right-3 top-2 text-xs text-muted-foreground pointer-events-none">{unit === "cm" ? "cm" : "px"}</span>
                 </div>
               </div>
             </div>
             
             <div className="pt-2">
               <Slider
-                min={10}
-                max={500}
-                step={1}
-                value={gridWidth}
+                min={unit === "cm" ? (10 * drillSize) / 10 : 10}
+                max={unit === "cm" ? (500 * drillSize) / 10 : 500}
+                step={unit === "cm" ? 0.5 : 1}
+                value={unit === "cm" ? Number((gridWidth / (10 / drillSize)).toFixed(2)) : gridWidth}
                 onChange={(e) => {
-                  const val = Number(e.target.value)
+                  const displayVal = Number(e.target.value)
+                  const val = unit === "cm" ? Math.round(displayVal * (10 / drillSize)) : displayVal
                   setGridWidth(val)
                   if (maintainAspect && originalAspect.current) {
                     setGridHeight(Math.max(10, Math.round(val / originalAspect.current)))
@@ -224,6 +249,36 @@ function App() {
                 }}
               />
             </div>
+            
+            {unit === "cm" && (
+              <div className="flex items-center gap-2 mt-2 p-2 bg-accent/30 rounded-md border border-border">
+                <span className="text-xs text-muted-foreground whitespace-nowrap">Drill size:</span>
+                <div className="relative w-20">
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    step={0.1}
+                    value={drillSize}
+                    onChange={(e) => {
+                      const newDrillSize = Number(e.target.value)
+                      if (newDrillSize > 0) {
+                        const oldCellsPerCm = 10 / drillSize
+                        const cmWidth = gridWidth / oldCellsPerCm
+                        const cmHeight = gridHeight / oldCellsPerCm
+                        
+                        const newCellsPerCm = 10 / newDrillSize
+                        setGridWidth(Math.max(10, Math.round(cmWidth * newCellsPerCm)))
+                        setGridHeight(Math.max(10, Math.round(cmHeight * newCellsPerCm)))
+                        setDrillSize(newDrillSize)
+                      }
+                    }}
+                    className="w-full h-6 rounded-sm border border-input bg-background px-2 py-0 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  <span className="absolute right-2 top-1.5 text-[10px] text-muted-foreground pointer-events-none">mm</span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between">
